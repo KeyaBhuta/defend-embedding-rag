@@ -1,36 +1,44 @@
 # DEFEND embedding RAG — separate project
 
-## Completed one-paper trial
+## One-paper trial results
 
-A real Qwen3-Embedding-0.6B retrieval trial completed on CPU/FP32:
-37 chunks, 6 selected passages, 2,333 evidence tokens. Recorded model loading plus
-retrieval took about 6 minutes 10 seconds, excluding setup/imports/aborted attempts.
-No paid API calls, rebuttal generation or training were performed.
+The trials used Qwen3-Embedding-0.6B and one atomic concern about logistic-regression
+covariance formulas.
 
-Read [the trial report](runs/one_paper_trial_fp32_01/TRIAL_REPORT.md) and
-[retrieved evidence](runs/one_paper_trial_fp32_01/inspection.md).
-Evidence was relevant but some mathematical boundaries and coverage need work
-before scaling. Integrity checks passed; this is not a semantic quality guarantee.
+| Retrieval setting | Chunks indexed | Passages selected | Evidence tokens | Named results found |
+| --- | ---: | ---: | ---: | --- |
+| Token windows, up to 6 passages / 3,000 tokens | 37 | 6 | 2,333 | Theorem 4 |
+| Section-first, up to 6 passages / 3,000 tokens | 41 | 6 | 2,244 | Theorem 4 |
+| Section-first, up to 8 passages / 4,000 tokens | 41 | 8 | 2,928 | Theorems 2 and 4 |
+| Section-first, up to 10 passages / 4,000 tokens | 41 | 10 | 3,688 | Theorems 1, 2, and 4 |
 
-This computer now has an isolated `.venv` with CPU PyTorch. Use
-`.\.venv\Scripts\python.exe` if `python` is not on PATH. A reproducible optional
-rerun is `./run_one_paper_trial.ps1 -Offline` (one concern, pinned models, fresh
-output folder, cached document embeddings reused). No rerun is needed to read
-the existing results. Do not use `--device cuda` until CUDA PyTorch is installed.
+Section-first chunking kept recognized display equations intact in the selected
+passages. Theorem 1 ranked tenth. The paragraph defining Theorem 2's covariance
+matrix ranked nineteenth and was outside the retrieved context.
 
-This folder contains the embedding-retrieval implementation and its own copies
-of all supporting Python modules. It does not import code from or modify the
-original `defend_gpt54` project. No models, environments, historical runs, Git
-history, or large datasets were copied.
+A local **Qwen3-0.6B SWRG smoke test** used the ten passages, produced parseable
+JSON, and incorrectly substituted the usual rate `N^(-1/2)` for the rare-event
+rate `N₁^(-1/2)`. It also left the covariance request unanswered. The intended
+generator for the main experiments is **Qwen3-8B**, which is pending evaluation.
+These trials used local inference without paid API calls.
+
+Local trial artifacts are under `runs/`. Git ignores that directory, so the
+summary above is available in a fresh clone while the raw outputs stay local.
+
+The code and supporting modules are self-contained. Setup requires Python and
+access to the external dataset. With an existing virtual environment on Windows,
+use `.\.venv\Scripts\python.exe` if `python` is unavailable on PATH.
 
 Start with [RAG_GUIDE.md](RAG_GUIDE.md) for installation, retrieval, DRG, SWRG,
 SA-Pred, and plain/coherent-reasoning SFT data preparation.
 
 ## First step: preview exactly one training concern
 
+Open a terminal in this repository and set the dataset path for your machine.
+
 ```powershell
-Set-Location "C:\Users\KEYA BHUTA\Documents\Codex\2026-11-11\tasks-1-write-scripts-for-generating\outputs\defend_embedding_rag"
-python prepare_rag.py --input "C:\Users\KEYA BHUTA\Downloads\data.zip" --split train --limit 1 --preview
+$datasetZip = 'C:\path\to\data.zip'
+python prepare_rag.py --input $datasetZip --split train --limit 1 --preview
 ```
 
 Preview requires no model download or paid API call and writes no output files.
@@ -45,7 +53,7 @@ python -m pip install -r requirements-rag.txt
 Actual one-concern embedding retrieval (can download model files and use compute):
 
 ```powershell
-python prepare_rag.py --input "C:\Users\KEYA BHUTA\Downloads\data.zip" --split train --limit 1 --output runs/rag_train_01 --cache data/rag_cache --device cpu --batch-size 1
+python prepare_rag.py --input $datasetZip --split train --limit 1 --output runs/rag_train_01 --cache data/rag_cache --device cpu --batch-size 1 --chunking section --top-k 10 --evidence-tokens 4000
 ```
 
 New `data/` caches, SFT exports and `runs/` outputs belong to THIS folder and are
@@ -58,7 +66,7 @@ those are read-only inputs and can be replaced with independent dataset paths.
 - Original-text chunking, saved embeddings, per-paper similarity retrieval.
 - Local Qwen generation commands for DRG/SWRG/SA-Pred and merged SFT checkpoints.
 - Reviewed chat-format SFT data export; no SFT/RL trainer is included.
-- One real embedding retrieval trial has completed; generation and training have not run.
+- One paper was used for retrieval comparisons and one local SWRG smoke test.
 - Offline tests use fake embeddings and do not establish model quality or GPU compatibility.
 
 ```powershell

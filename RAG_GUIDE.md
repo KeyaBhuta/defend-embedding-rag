@@ -2,12 +2,10 @@
 
 ## Local trial completed
 
-See [the measured trial report](runs/one_paper_trial_fp32_01/TRIAL_REPORT.md).
-One paper/concern was retrieved using Qwen3-Embedding-0.6B on CPU/FP32. The CPU
-environment and pinned model cache now exist in this folder. The trial found
-relevant evidence but also equation-boundary and coverage limitations. It did
-not run generation or SFT. An earlier BF16 CPU attempt was aborted and is not a
-completed result. Prefer FP32 on this laptop; lower precision was slower here.
+See the [README](README.md#one-paper-trial-results) for the retrieval comparisons
+and the one-draft SWRG smoke test. Qwen3-Embedding-0.6B performed retrieval.
+The SWRG draft used Qwen3-0.6B on CPU in FP32 and contained a convergence-rate
+error. The Qwen3-8B generation experiment is pending.
 
 `--dtype` records embedding precision in the cache identity, and `--show-progress`
 prints embedding batch progress. `run_one_paper_trial.ps1` uses the installed
@@ -330,8 +328,8 @@ different sampled/API runs and attribute all differences to retrieval.
 No real embedding quality, model-generation success, training outcome or GPU time
 is established by the offline tests. The installed environment has now completed
 one CPU embedding trial; its separate report documents results and limitations.
-GPU execution and rebuttal generation remain untested here. Do not infer broad
-retrieval quality from this one example before scaling to hundreds of papers.
+One local Qwen3-0.6B SWRG draft was also generated. GPU execution and Qwen3-8B
+generation remain untested here. The results cover one example.
 
 ## 9. Offline verification and references
 
