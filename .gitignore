@@ -1,0 +1,9 @@
+﻿data/
+runs/
+*.zip
+.venv/
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
