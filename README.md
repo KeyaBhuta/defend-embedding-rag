@@ -1,5 +1,37 @@
 # DEFEND embedding RAG — separate project
 
+## Kaggle GPU trial on one training concern
+
+Retrieval defaults to **Qwen3-Embedding-4B**. SWRG, DRG and SA-Pred generation
+default to **Qwen3-8B**. The PowerShell shortcut replays the older 0.6B CPU
+retrieval trial. On Kaggle, enable a GPU, open the repository directory with
+`%cd` in the notebook, and attach the ZIP as a private dataset. Run these cells
+in order. Replace the example ZIP path with the path shown by Kaggle.
+
+```python
+%pip install -r requirements-rag.txt bitsandbytes
+dataset_zip = "/kaggle/input/YOUR-DATASET/data.zip"
+!nvidia-smi
+!python prepare_rag.py --input "{dataset_zip}" --split train --limit 1 --preview
+```
+
+Each command below runs in its own process so retrieval releases GPU memory
+before generation starts. The first model run needs access to the weights.
+
+```python
+!python prepare_rag.py --input "{dataset_zip}" --split train --limit 1 --output /kaggle/working/rag_4b_01 --cache /kaggle/working/rag_cache --device cuda --dtype float16 --batch-size 1 --chunking section --top-k 10 --evidence-tokens 4000
+```
+
+Inspect `/kaggle/working/rag_4b_01/inspection.md`, then generate one SWRG draft:
+
+```python
+!python rag_experiments.py --input /kaggle/working/rag_4b_01/retrieval.jsonl --method swrg --limit 1 --dtype float16 --load-in-4bit --output /kaggle/working/swrg_8b_01 --run
+```
+
+The generation command uses 4-bit weights to reduce GPU memory use. Read
+`/kaggle/working/swrg_8b_01/results.jsonl` for the result. Use fresh output
+directory names if you repeat the trial.
+
 ## One-paper trial results
 
 The trials used Qwen3-Embedding-0.6B and one atomic concern about logistic-regression

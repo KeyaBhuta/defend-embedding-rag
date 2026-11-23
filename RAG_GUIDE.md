@@ -81,7 +81,7 @@ batch size only after checking memory. Use a new output directory for each run.
 
 Defaults:
 
-- Embeddings: `Qwen/Qwen3-Embedding-0.6B`; query instruction is explicit and saved.
+- Embeddings: `Qwen/Qwen3-Embedding-4B` by default. The Windows replay shortcut pins the original 0.6B checkpoint.
 - Chunk/budget tokenizer: `Qwen/Qwen3-8B`, tokenizer only (not generator weights).
 - 500-token source windows, 75-token overlap, snapping to later paragraph/newline
   boundaries where available. Offsets refer to unchanged Unicode source text.
@@ -175,9 +175,9 @@ python rag_experiments.py --input runs/rag_train_01/retrieval.jsonl --limit 1 --
 - All requests/raw responses are saved. Invalid JSON or output truncation stops
   at the failed example with an error record. No automatic retry or paid fallback.
 - `--device-map auto` uses Transformers/Accelerate placement; `--device-map cpu`
-  requests CPU placement. No quantization or LoRA adapter loading is implemented.
+  requests CPU placement. On CUDA, `--load-in-4bit` enables optional NF4 generator weights with bitsandbytes.
 
-The code has not been run with real Qwen weights in this workspace. Verify
+The 4B retrieval and 8B generation combination is pending GPU validation. Verify
 hardware compatibility, output formatting and evidence quality on one example
 before scaling. Model outputs and automatic audit scores are not guaranteed.
 

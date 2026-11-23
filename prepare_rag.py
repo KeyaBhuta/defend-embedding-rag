@@ -35,7 +35,7 @@ def main():
     p.add_argument('--unit', choices=['concern', 'review'], default='concern')
     p.add_argument('--output', help='New directory containing retrieval.jsonl and inspection.md')
     p.add_argument('--cache', default='data/rag_cache')
-    p.add_argument('--embedding-model', default='Qwen/Qwen3-Embedding-0.6B')
+    p.add_argument('--embedding-model', default='Qwen/Qwen3-Embedding-4B')
     p.add_argument('--embedding-revision', default='main', help='Pin commit for reproducible experiments')
     p.add_argument('--tokenizer', default='Qwen/Qwen3-8B', help='Generator tokenizer for chunk/evidence budgets')
     p.add_argument('--tokenizer-revision', default='main')
@@ -63,7 +63,8 @@ def main():
         p.error(str(exc))
     if a.preview:
         print(json.dumps({'records': len(rows), 'papers': len({r['paper_id'] for r in rows}),
-                          'unit': a.unit, 'model_downloads': 0, 'model_calls': 0,
+                          'unit': a.unit, 'embedding_model': a.embedding_model,
+                          'tokenizer': a.tokenizer, 'model_downloads': 0, 'model_calls': 0,
                           'examples': [{'id': r['id'], 'paper_id': r['paper_id'],
                                         'paper_characters': len(r['paper']),
                                         'query': r['review_segment']} for r in rows]}, indent=2))

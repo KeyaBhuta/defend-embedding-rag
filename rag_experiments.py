@@ -65,8 +65,17 @@ class LocalRunner(Runner):
         self.tokenizer = AutoTokenizer.from_pretrained(args.model, revision=args.revision,
             local_files_only=args.local_files_only)
         dtype = 'auto' if args.dtype == 'auto' else getattr(torch, args.dtype)
+        load_options = {}
+        if args.load_in_4bit:
+            if not torch.cuda.is_available():
+                raise ValueError('--load-in-4bit requires a CUDA GPU in this runner')
+            from transformers import BitsAndBytesConfig
+            load_options['quantization_config'] = BitsAndBytesConfig(
+                load_in_4bit=True, bnb_4bit_quant_type='nf4',
+                bnb_4bit_compute_dtype=torch.float16 if dtype == 'auto' else dtype)
         self.model = AutoModelForCausalLM.from_pretrained(args.model, revision=args.revision,
-            device_map=args.device_map, torch_dtype=dtype, local_files_only=args.local_files_only).eval()
+            device_map=args.device_map, torch_dtype=dtype, local_files_only=args.local_files_only,
+            **load_options).eval()
         native = getattr(self.model.config, 'max_position_embeddings', args.context_tokens)
         if args.context_tokens > native:
             raise ValueError(f'Configured context exceeds checkpoint native limit {native}')
@@ -125,6 +134,8 @@ def main():
     p.add_argument('--context-tokens', type=int, default=16384)
     p.add_argument('--max-output-tokens', type=int, default=2048)
     p.add_argument('--device-map', default='auto')
+    p.add_argument('--load-in-4bit', action='store_true',
+                   help='Load generator weights in NF4 on CUDA. Requires bitsandbytes.')
     p.add_argument('--dtype', choices=['auto', 'float32', 'float16', 'bfloat16'], default='auto',
                    help='Model precision. Use float32 for the CPU smoke test on this laptop.')
     p.add_argument('--local-files-only', action='store_true')

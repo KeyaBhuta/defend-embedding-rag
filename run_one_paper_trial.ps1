@@ -24,7 +24,8 @@ $trialArgs = @('prepare_rag.py', '--input', $InputZip, '--split', 'train',
     '--limit', '1', '--output', (Join-Path 'runs' $OutputName),
     '--cache', 'data/rag_cache', '--device', $Device, '--dtype', $Dtype,
     '--chunking', $Chunking, '--top-k', $TopK,
-    '--batch-size', '1', '--show-progress', '--embedding-revision', '97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3',
+    '--batch-size', '1', '--show-progress', '--embedding-model', 'Qwen/Qwen3-Embedding-0.6B',
+    '--embedding-revision', '97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3',
     '--tokenizer-revision', 'b968826d9c46dd6066d109eabc6255188de91218')
 if ($Offline) { $trialArgs += '--local-files-only' }
 & $trialPython @trialArgs
