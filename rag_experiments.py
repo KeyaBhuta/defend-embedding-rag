@@ -167,6 +167,10 @@ def main():
     p.add_argument('--method', required=True, choices=['drg', 'swrg', 'sa_pred', 'plain_sft', 'reasoning_sft'])
     p.add_argument('--review-coverage', action='store_true',
                    help='Use the full-review coverage prompt for DRG')
+    p.add_argument('--concise-review', action='append', default=[], metavar='ID',
+                   help='Retry this DRG review with a concise response instruction')
+    p.add_argument('--continue-on-output-error', action='store_true',
+                   help='Record invalid outputs and proceed to the next review')
     p.add_argument('--model', help='Base or merged fine-tuned HF checkpoint; required for SFT methods')
     p.add_argument('--revision', default='main')
     p.add_argument('--output', help='New run directory')
@@ -203,7 +207,8 @@ def main():
     runner = LocalRunner(a)
     (runner.root / 'config.json').write_text(json.dumps(vars(a), indent=2), encoding='utf-8')
     with (runner.root / 'results.jsonl').open('x', encoding='utf-8') as out:
-        for row in rows:
+        for position, row in enumerate(rows, 1):
+            print(f"Starting {position}/{len(rows)}: {row['id']}", flush=True)
             result = {'id': row['id'], 'paper_id': row['paper_id'], 'method': a.method,
                       'student_context_sha256': context_hash(row), 'retrieval': row['retrieval'],
                       'record_unit': row.get('record_unit'), 'review_id': row.get('review_id')}
@@ -213,12 +218,20 @@ def main():
                 else:
                     reasoning = a.method == 'reasoning_sft'
                     messages = student_messages(row, reasoning, review_coverage=a.review_coverage)
+                    if row['id'] in a.concise_review and a.method == 'drg':
+                        messages[0]['content'] += (
+                            '\nWrite a concise rebuttal of at most 450 words. Group overlapping '
+                            'concerns, answer each point once, and close the JSON object immediately '
+                            'after the rebuttal. Use one string for the entire response.')
                     result['output'] = runner.generate(a.method, messages,
                                                        CoherentRebuttal if reasoning else Rebuttal)
             except Exception as exc:
                 result['error'] = f'{type(exc).__name__}: {exc}'
                 out.write(json.dumps(result, ensure_ascii=False) + '\n')
                 out.flush()
+                if a.continue_on_output_error and isinstance(exc, ValueError):
+                    print(f"Failed {position}/{len(rows)}: {row['id']}: {exc}", flush=True)
+                    continue
                 raise SystemExit(f'Stopped after failed example {row["id"]}: {exc}')
             out.write(json.dumps(result, ensure_ascii=False) + '\n')
             out.flush()
