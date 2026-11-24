@@ -114,6 +114,10 @@ class LocalRunner(Runner):
             device_map=args.device_map, torch_dtype=dtype, local_files_only=args.local_files_only,
             **load_options).eval()
         native = getattr(self.model.config, 'max_position_embeddings', args.context_tokens)
+        if args.prefill_chunk_size:
+            if not hasattr(self.model.generation_config, 'prefill_chunk_size'):
+                raise ValueError('Installed Transformers does not support chunked prefill')
+            self.model.generation_config.prefill_chunk_size = args.prefill_chunk_size
         if args.context_tokens > native:
             raise ValueError(f'Configured context exceeds checkpoint native limit {native}')
         self.counter = 0
@@ -175,6 +179,7 @@ def main():
     p.add_argument('--revision', default='main')
     p.add_argument('--output', help='New run directory')
     p.add_argument('--context-tokens', type=int, default=16384)
+    p.add_argument('--prefill-chunk-size', type=int, help='Process long prompts in blocks of this many tokens')
     p.add_argument('--max-output-tokens', type=int, default=2048)
     p.add_argument('--device-map', default='auto')
     p.add_argument('--load-in-4bit', action='store_true',
@@ -184,6 +189,8 @@ def main():
     p.add_argument('--local-files-only', action='store_true')
     p.add_argument('--run', action='store_true', help='Explicitly load model and generate (otherwise preview)')
     a = p.parse_args()
+    if a.prefill_chunk_size is not None and a.prefill_chunk_size < 1:
+        p.error('--prefill-chunk-size must be positive')
     if a.review_coverage and a.method != 'drg':
         p.error('--review-coverage requires --method drg')
     if a.method.endswith('sft') and not a.model:
