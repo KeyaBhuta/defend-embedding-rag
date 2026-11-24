@@ -254,7 +254,10 @@ subprocess.run([
 Install the notebook dependencies and bitsandbytes as described in the README.
 `--review-coverage` applies one fixed prompt to all reviews and records the
 setting in `generation/config.json`. The per-call request logs preserve the exact
-prompt and evidence. The rebuttals are in `generation/results.jsonl`. Keep the
+prompt and evidence. The prompt requests one string. If the model instead returns
+a numbered `concern_1`, `concern_2`, etc. object with paragraph values, the
+coverage runner joins the paragraphs in numerical order and preserves the raw
+model response in the call log. The rebuttals are in `generation/results.jsonl`. Keep the
 evidence and generation directories together for evaluation. The full run should
 produce 50 successful rows across 20 distinct paper IDs. The generator stops
 at the first failed row and saves its error alongside any earlier results.

@@ -1,9 +1,10 @@
 """Local Qwen generation from saved evidence. Preview by default; --run loads weights."""
 import argparse
 import json
+import re
 import time
 from pathlib import Path
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from data_input import load_records
 from pipeline import Runner
 from prompts import BASE, STAGES
@@ -46,6 +47,9 @@ def student_messages(row, reasoning=False, review_coverage=False):
     system = DIRECT_SYSTEM
     if review_coverage:
         system += '\n' + DRG_COVERAGE
+        instruction = ('Return exactly one JSON field called "rebuttal". Its value must be a '
+                       'single string containing the entire response. Put any numbered answers '
+                       'or paragraphs inside that string, with escaped newlines between them.')
     return [{'role': 'system', 'content': system + '\n' + instruction},
             {'role': 'user', 'content': json.dumps(
                 {'paper': row['paper'], 'review_segment': row['review_segment']}, ensure_ascii=False)}]
@@ -59,13 +63,31 @@ def check_method(rows, method):
             raise ValueError('DRG requires full_review records; other methods require concern records')
 
 
-def parse_output(text, schema):
+def parse_output(text, schema, *, allow_concern_map=False):
     text = text.strip()
     if text.startswith('```json\n') and text.endswith('```'):
         text = text[8:-3].strip()
     elif text.startswith('```\n') and text.endswith('```'):
         text = text[4:-3].strip()
-    return schema.model_validate_json(text).model_dump()
+    try:
+        return schema.model_validate_json(text).model_dump()
+    except ValidationError as error:
+        if not allow_concern_map or schema is not Rebuttal:
+            raise
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError:
+            raise error from None
+        if not isinstance(payload, dict) or payload.keys() != {'rebuttal'}:
+            raise
+        concerns = payload['rebuttal']
+        if not isinstance(concerns, dict) or not concerns or not all(
+                re.fullmatch(r'concern_[1-9][0-9]*', key) and isinstance(value, str) and value.strip()
+                for key, value in concerns.items()):
+            raise
+        ordered = sorted(concerns, key=lambda key: int(key.removeprefix('concern_')))
+        rebuttal = '\n\n'.join(concerns[key].strip() for key in ordered)
+        return schema(rebuttal=rebuttal).model_dump()
 
 
 class LocalRunner(Runner):
@@ -126,7 +148,7 @@ class LocalRunner(Runner):
         prefix.with_suffix('.response.json').write_text(json.dumps(response, ensure_ascii=False, indent=2), encoding='utf-8')
         if truncated:
             raise ValueError('Generation reached token limit; response retained for inspection')
-        value = parse_output(text, schema)
+        value = parse_output(text, schema, allow_concern_map=stage == 'drg' and self.args.review_coverage)
         response['parsed'] = value
         prefix.with_suffix('.response.json').write_text(json.dumps(response, ensure_ascii=False, indent=2), encoding='utf-8')
         return value

@@ -180,6 +180,17 @@ class RetrievalTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_output('Here is a reply but not JSON', Rebuttal)
 
+    def test_drg_coverage_accepts_numbered_concern_paragraphs(self):
+        response = '{"rebuttal":{"concern_10":"Last.","concern_2":"Second.","concern_1":"First."}}'
+        with self.assertRaises(ValueError):
+            parse_output(response, Rebuttal)
+        self.assertEqual(
+            parse_output(response, Rebuttal, allow_concern_map=True),
+            {'rebuttal': 'First.\n\nSecond.\n\nLast.'},
+        )
+        with self.assertRaises(ValueError):
+            parse_output('{"rebuttal":{"concern_1":["First."]}}', Rebuttal, allow_concern_map=True)
+
     def test_local_generation_cli_uses_saved_evidence_without_reference(self):
         captured = []
 
