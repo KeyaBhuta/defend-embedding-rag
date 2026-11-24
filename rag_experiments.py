@@ -16,6 +16,18 @@ Missing evidence in retrieved excerpts does not establish absence from the full
 paper. Acknowledge uncertainty and limitations when necessary. Return the
 requested JSON object, without markdown or additional text.'''
 
+DRG_COVERAGE = '''Address every substantive concern in the complete review in one
+response. Group related concerns only when the same explanation answers them.
+For each concern, give the concrete answer or clarification the evidence supports.
+If the reviewer asks how a result follows, explain the relevant steps and give the
+requested derivation, substitution, calculation, or worked example when supported.
+For a named equation, table, figure, or experiment, explain what it directly shows
+and distinguish that from how it is used or what can be inferred from it. Tie each
+reported value, comparison, or complexity claim to the specific quantity or
+operation it describes. If a requested detail requires evidence that is absent,
+say what is missing and answer the parts you can. Acknowledge supported limitations
+and correct a reviewer's claim only when the supplied evidence warrants it.'''
+
 
 class Rebuttal(BaseModel):
     rebuttal: str
@@ -26,12 +38,15 @@ class CoherentRebuttal(BaseModel):
     rebuttal: str
 
 
-def student_messages(row, reasoning=False):
+def student_messages(row, reasoning=False, review_coverage=False):
     instruction = ('Give one concise, coherent, evidence-grounded decision explanation '
                    'connecting the concern, evidence and response action, followed by the rebuttal. '
                    'Use fields coherent_reasoning and rebuttal.' if reasoning else
                    'Give the rebuttal in the field rebuttal.')
-    return [{'role': 'system', 'content': DIRECT_SYSTEM + '\n' + instruction},
+    system = DIRECT_SYSTEM
+    if review_coverage:
+        system += '\n' + DRG_COVERAGE
+    return [{'role': 'system', 'content': system + '\n' + instruction},
             {'role': 'user', 'content': json.dumps(
                 {'paper': row['paper'], 'review_segment': row['review_segment']}, ensure_ascii=False)}]
 
@@ -128,6 +143,8 @@ def main():
     p.add_argument('--input', required=True, help='Saved retrieval.jsonl')
     p.add_argument('--limit', required=True, type=int)
     p.add_argument('--method', required=True, choices=['drg', 'swrg', 'sa_pred', 'plain_sft', 'reasoning_sft'])
+    p.add_argument('--review-coverage', action='store_true',
+                   help='Use the full-review coverage prompt for DRG')
     p.add_argument('--model', help='Base or merged fine-tuned HF checkpoint; required for SFT methods')
     p.add_argument('--revision', default='main')
     p.add_argument('--output', help='New run directory')
@@ -141,6 +158,8 @@ def main():
     p.add_argument('--local-files-only', action='store_true')
     p.add_argument('--run', action='store_true', help='Explicitly load model and generate (otherwise preview)')
     a = p.parse_args()
+    if a.review_coverage and a.method != 'drg':
+        p.error('--review-coverage requires --method drg')
     if a.method.endswith('sft') and not a.model:
         p.error('Supply the actual fine-tuned/merged checkpoint with --model')
     a.model = a.model or 'Qwen/Qwen3-8B'
@@ -153,6 +172,7 @@ def main():
         p.error(str(exc))
     if not a.run:
         print(json.dumps({'method': a.method, 'model': a.model, 'records': len(rows),
+            'review_coverage': a.review_coverage,
             'planned_calls': len(rows) * (5 if a.method == 'sa_pred' else 1),
             'model_calls': 0, 'note': 'SA-Pred: DP, ETP, RAP, synthesis, then separate audit.'}, indent=2))
         return
@@ -170,7 +190,8 @@ def main():
                     result['without_rebuttal'] = runner.arm(row, 'without_rebuttal')
                 else:
                     reasoning = a.method == 'reasoning_sft'
-                    result['output'] = runner.generate(a.method, student_messages(row, reasoning),
+                    messages = student_messages(row, reasoning, review_coverage=a.review_coverage)
+                    result['output'] = runner.generate(a.method, messages,
                                                        CoherentRebuttal if reasoning else Rebuttal)
             except Exception as exc:
                 result['error'] = f'{type(exc).__name__}: {exc}'

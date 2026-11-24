@@ -215,6 +215,50 @@ DRG uses the whole review as its query and generates one full-review rebuttal.
 Record this retrieval policy; it can underrepresent smaller concerns. Concern-wise
 query expansion/merging would be a different protocol, not implemented here.
 
+### Held-out DRG with the review-coverage prompt
+
+The supplied 20-paper test inputs produce 50 whole-review records. Convert them
+with the command above and attach the resulting JSONL as a private Kaggle input.
+In the notebook, set `repo` to the cloned project folder and `test_file` to the
+mounted JSONL path. Run one record first to check the pipeline. For the full run,
+set `limit = 50` and use fresh output paths.
+
+```python
+import subprocess
+import sys
+from pathlib import Path
+
+repo = Path("/kaggle/working/defend-embedding-rag")
+test_file = Path("/kaggle/input/YOUR-DATASET/drg_reviews_20papers.jsonl")
+limit = 1
+root = Path(f"/kaggle/working/drg_coverage_{limit:02d}")
+evidence = root / "evidence"
+generation = root / "generation"
+
+subprocess.run([
+    sys.executable, "prepare_rag.py", "--input", str(test_file),
+    "--unit", "review", "--limit", str(limit), "--output", str(evidence),
+    "--cache", "/kaggle/working/rag_cache", "--device", "cuda",
+    "--dtype", "float16", "--batch-size", "1",
+    "--chunking", "section", "--top-k", "10", "--evidence-tokens", "4000",
+], cwd=repo, check=True)
+
+subprocess.run([
+    sys.executable, "rag_experiments.py",
+    "--input", str(evidence / "retrieval.jsonl"), "--method", "drg",
+    "--review-coverage", "--limit", str(limit), "--model", "Qwen/Qwen3-8B",
+    "--dtype", "float16", "--load-in-4bit", "--output", str(generation), "--run",
+], cwd=repo, check=True)
+```
+
+Install the notebook dependencies and bitsandbytes as described in the README.
+`--review-coverage` applies one fixed prompt to all reviews and records the
+setting in `generation/config.json`. The per-call request logs preserve the exact
+prompt and evidence. The rebuttals are in `generation/results.jsonl`. Keep the
+evidence and generation directories together for evaluation. The full run should
+produce 50 successful rows across 20 distinct paper IDs. The generator stops
+at the first failed row and saves its error alongside any earlier results.
+
 ## 6. Existing GPT teacher can use retrieved context
 
 Preview only:
